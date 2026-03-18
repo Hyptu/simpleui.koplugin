@@ -757,17 +757,27 @@ function M.getCoverBB(filepath, w, h)
         _bim_cover_order[#_bim_cover_order + 1] = key
         return cached
     end
+    
     local bim = M.getBookInfoManager()
     if not bim then return nil end
     local ok, bookinfo = pcall(function() return bim:getBookInfo(filepath, true) end)
     if not ok then return nil end
-    if bookinfo and bookinfo.cover_fetched and bookinfo.has_cover and bookinfo.cover_bb then
-        local bb = _scaleBBToSlot(bookinfo.cover_bb, w, h)
-        _bim_cover_cache[key]                   = bb
-        _bim_cover_order[#_bim_cover_order + 1] = key
-        _bimEvict()
-        return bb
+    
+    -- CORREÇÃO: Verificar se a tentativa de extração já foi feita
+    if bookinfo and bookinfo.cover_fetched then
+        if bookinfo.has_cover and bookinfo.cover_bb then
+            local bb = _scaleBBToSlot(bookinfo.cover_bb, w, h)
+            _bim_cover_cache[key]                   = bb
+            _bim_cover_order[#_bim_cover_order + 1] = key
+            _bimEvict()
+            return bb
+        else
+            -- Já tentámos extrair antes e sabemos que não tem capa (ou falhou).
+            -- Devolve nil imediatamente para não desencadear um poll loop.
+            return nil
+        end
     end
+
     if not M.cover_extraction_pending then
         M.cover_extraction_pending = true
         pcall(function()

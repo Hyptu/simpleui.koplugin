@@ -117,6 +117,9 @@ function SimpleUIPlugin:onResume()
         if ok_rg and RG and RG.invalidateCache then RG.invalidateCache() end
         local ok_rs, RS = pcall(require, "desktop_modules/module_reading_stats")
         if ok_rs and RS and RS.invalidateCache then RS.invalidateCache() end
+        -- Note: module_quote highlight pool is NOT invalidated on resume.
+        -- Highlights only change when the user reads a book; invalidating here
+        -- would cause the displayed quote to change on every wakeup/focus change.
         -- If the Homescreen is already visible, force a rebuild so the freshly
         -- invalidated stats are reflected immediately (e.g. after marking a book
         -- as read inside the reader and returning here).
