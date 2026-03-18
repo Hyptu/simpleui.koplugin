@@ -211,6 +211,18 @@ function SimpleUIPlugin:_updateFMHomeIcon() end
 -- Main menu entry (menu.lua is lazy-loaded on first access)
 -- ---------------------------------------------------------------------------
 
+-- Derive the absolute path to menu.lua from this file's own source path.
+-- This is the same technique used by config.lua for icon paths and is robust
+-- across all platforms (Kindle, Kobo, Android) regardless of working directory.
+-- Using dofile() instead of require() sidesteps two problems:
+--   1. require("menu") collides with KOReader's own ui/menu module, which is
+--      already registered in package.loaded["menu"] as a table — calling it
+--      as a function produces "attempt to call a table value".
+--   2. require("plugins/simpleui.koplugin/menu") depends on package.path and
+--      the process working directory, which are not guaranteed on all devices.
+local _plugin_dir = debug.getinfo(1, "S").source:match("^@(.+/)[^/]+$") or "./"
+local _menu_path  = _plugin_dir .. "menu.lua"
+
 local menu_module_loaded = false
 
 function SimpleUIPlugin:addToMainMenu(menu_items)
@@ -218,36 +230,30 @@ function SimpleUIPlugin:addToMainMenu(menu_items)
         menu_module_loaded = true
         -- Capture the stub reference NOW, before the installer overwrites it.
         -- The installer sets SimpleUIPlugin.addToMainMenu = new_fn (rawset on the
-        -- class), so after require() both rawget(SimpleUIPlugin, ...) and
+        -- class), so after dofile() both rawget(SimpleUIPlugin, ...) and
         -- self.addToMainMenu resolve to the same new function — comparing them
         -- would always be equal and the menu would never open.
         -- Comparing against the stub captured here is the correct check.
         local stub_fn = rawget(SimpleUIPlugin, "addToMainMenu")
-        -- Use the full plugin-relative path to avoid colliding with KOReader's
-        -- own "menu" module (ui/menu.lua) which is already registered in
-        -- package.loaded["menu"] as a table.  require("menu") would return that
-        -- table and the subsequent call — require("menu")(SimpleUIPlugin) —
-        -- would fail with "attempt to call a table value".
-        local MENU_KEY = "plugins/simpleui.koplugin/menu"
-        -- Clear any stale cached result from a previous failed load so that
-        -- require() always re-executes the installer on retry.
-        package.loaded[MENU_KEY] = nil
-        local ok, err = pcall(function() require(MENU_KEY)(SimpleUIPlugin) end)
+        -- dofile() always re-executes the file (no package.loaded cache),
+        -- so retries after a failed load work automatically.
+        local ok, result = pcall(function()
+            local installer = dofile(_menu_path)
+            installer(SimpleUIPlugin)
+        end)
         if not ok then
             menu_module_loaded = false
-            package.loaded[MENU_KEY] = nil  -- allow clean retry next time
-            logger.err("simpleui: menu.lua failed to load: " .. tostring(err))
+            logger.err("simpleui: menu.lua failed to load: " .. tostring(result))
             menu_items.simpleui = { sorting_hint = "tools", text = "Simple UI", sub_item_table = {} }
             return
         end
         -- Verify the installer actually replaced addToMainMenu by comparing
-        -- the new raw slot against the stub we captured before the require.
+        -- the new raw slot against the stub we captured before the dofile.
         local real_fn = rawget(SimpleUIPlugin, "addToMainMenu")
         if type(real_fn) == "function" and real_fn ~= stub_fn then
             real_fn(self, menu_items)
         else
             menu_module_loaded = false
-            package.loaded[MENU_KEY] = nil
             logger.err("simpleui: menu installer did not replace addToMainMenu — opening menu aborted")
             menu_items.simpleui = { sorting_hint = "tools", text = "Simple UI", sub_item_table = {} }
         end
