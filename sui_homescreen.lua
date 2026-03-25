@@ -873,6 +873,13 @@ function HomescreenWidget:onShow()
     --   self._navbar_container[1] = inner_widget (our placeholder, the _navbar_inner)
     --
     -- We replace the inner slot directly so the navbar (bar, topbar) is untouched.
+    
+    -- Invalidate reading stat caches so the build always shows fresh data,
+    -- e.g. after returning from the reader without a suspend/resume cycle.
+    local ok_rs, RS = pcall(require, "desktop_modules/module_reading_stats")
+    if ok_rs and RS and RS.invalidateCache then RS.invalidateCache() end
+    local ok_rg, RG = pcall(require, "desktop_modules/module_reading_goals")
+    if ok_rg and RG and RG.invalidateCache then RG.invalidateCache() end
     if self._navbar_container then
         local old = self._navbar_container[1]
         local new = self:_buildContent()

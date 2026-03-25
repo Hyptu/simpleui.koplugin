@@ -154,7 +154,7 @@ local function fetchAllStats(shared_conn)
         -- Use '@' as separator — avoids the integer ambiguity of '-'
         -- (page=10, id_book=1 vs page=1, id_book=01 both collapse to "10-1").
         r.today_pages = tonumber(conn:rowexec(string.format(
-            "SELECT count(DISTINCT page||'@'||id_book) FROM page_stat WHERE start_time>=%d;",
+            "SELECT count(DISTINCT page||'@'||id_book) FROM page_stat WHERE start_time>=%d AND duration>0;",
             start_today))) or 0
 
         -- Aggregate per-day first (inner GROUP BY dates), then average across days
@@ -168,7 +168,7 @@ local function fetchAllStats(shared_conn)
             FROM (SELECT strftime('%%Y-%%m-%%d',start_time,'unixepoch','localtime') AS dates,
                          sum(duration) AS sd,
                          count(DISTINCT page||'@'||id_book) AS pg
-                  FROM page_stat WHERE start_time>=%d
+                  FROM page_stat WHERE start_time>=%d AND duration>0
                   GROUP BY dates);]], week_start))
         if rw and rw[1] and rw[1][1] then
             local nd = tonumber(rw[1][1]) or 0
