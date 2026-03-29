@@ -1578,3 +1578,19 @@ msgstr "Temps de lecture"
 #: desktop_modules/module_currently.lua:276
 msgid "Time remaining"
 msgstr "Temps restant"
+
+#: desktop_modules/module_currently.lua
+msgid "%s left"
+msgstr "%s restant"
+
+#: desktop_modules/module_currently.lua
+msgid "1 day"
+msgstr "1 jour"
+
+#: desktop_modules/module_currently.lua
+msgid "%d days"
+msgstr "%d jours"
+
+#: desktop_modules/module_currently.lua
+msgid "Stats layout"
+msgstr "Disposition des statistiques"
