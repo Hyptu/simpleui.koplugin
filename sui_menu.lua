@@ -1740,6 +1740,42 @@ SimpleUIPlugin.addToMainMenu = function(self, menu_items)
                                         keep_menu_open = true,
                                         callback       = function() FC.setHideUnderline(not FC.getHideUnderline()); _refreshFC() end,
                                     },
+                                    {
+                                        text           = _("Placeholder Cover for Folders"),
+                                        checked_func   = function() return FC.getSubfolderCover() end,
+                                        enabled_func   = function() return FC.isEnabled() end,
+                                        keep_menu_open = true,
+                                        hold_callback  = function()
+                                            local InfoMessage = require("ui/widget/infomessage")
+                                            local UIManager   = require("ui/uimanager")
+                                            UIManager:show(InfoMessage:new{
+                                                text = _("When enabled, folders that contain only subfolders (or are empty) display a placeholder cover with a folder icon. If \"Number of Books in Folder\" is active, the badge shows the number of subfolders instead."),
+                                            })
+                                        end,
+                                        callback       = function()
+                                            FC.setSubfolderCover(not FC.getSubfolderCover())
+                                            FC.invalidateCache()
+                                            _refreshFC()
+                                        end,
+                                    },
+                                    {
+                                        text           = _("Use Cover from Subfolders"),
+                                        checked_func   = function() return FC.getRecursiveCover() end,
+                                        enabled_func   = function() return FC.isEnabled() and FC.getSubfolderCover() end,
+                                        keep_menu_open = true,
+                                        hold_callback  = function()
+                                            local InfoMessage = require("ui/widget/infomessage")
+                                            local UIManager   = require("ui/uimanager")
+                                            UIManager:show(InfoMessage:new{
+                                                text = _("When enabled, folders with no direct ebooks display the first available cover found by scanning subfolders recursively (up to 3 levels deep). Falls back to the placeholder cover if no cover is found."),
+                                            })
+                                        end,
+                                        callback       = function()
+                                            FC.setRecursiveCover(not FC.getRecursiveCover())
+                                            FC.invalidateCache()
+                                            _refreshFC()
+                                        end,
+                                    },
                                 }
                             end,
                         },
