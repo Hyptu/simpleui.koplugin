@@ -560,6 +560,154 @@ function HomescreenWidget:init()
             },
         })
     end
+
+    -- ── Keyboard navigation ───────────────────────────────────────────────────
+    -- Layout model: two content rows stacked vertically, then the bottom bar.
+    --   Row A — "Currently reading"  (single book, index 1 in _kb_book_items_fp)
+    --   Row B — "Recent books"       (horizontal strip, indices _kb_first_rec_idx…end)
+    --   Row C — Bottom navigation bar (entered via enterNavbarKbFocus)
+    --
+    -- Up / Down  → move between rows A, B, C.
+    -- Left / Right → move within row B only (no effect on row A).
+    -- Press → open focused book.
+    -- Menu → open main settings menu.
+    --
+    -- Create a per-instance key_events table (avoids mutating the class table).
+    self.key_events = {}
+    if Device:hasDPad() then
+        self.key_events.HSFocusUp    = { { "Up"    } }
+        self.key_events.HSFocusDown  = { { "Down"  } }
+        self.key_events.HSFocusLeft  = { { "Left"  } }
+        self.key_events.HSFocusRight = { { "Right" } }
+        self.key_events.HSKbPress    = { { "Press" } }
+    end
+    if Device:hasKeys() then
+        self.key_events.HSOpenMenu   = { { "Menu"  } }
+    end
+
+    -- Menu key → open the KOReader top settings menu (same as swipe-from-top).
+    function self:onHSOpenMenu()
+        local FM = package.loaded["apps/filemanager/filemanager"]
+        local inst = FM and FM.instance
+        if inst and inst.menu then inst.menu:onTapShowMenu() end
+        return true
+    end
+
+    -- Up: move to the row above the current focus.
+    --   nil          → enter focus at first book of the last content row
+    --   on recent    → move to currently-reading (row A) if it exists
+    --   on currently → already at top, no-op
+    function self:onHSFocusUp()
+        local books = self._kb_book_items_fp
+        if not books or #books == 0 then return end
+        local frec = self._kb_first_rec_idx   -- nil when no recent row
+
+        if self._kb_focus_idx == nil then
+            -- Enter focus at the first book of the lowest content row.
+            self._kb_focus_idx = frec or 1
+        elseif frec and self._kb_focus_idx >= frec then
+            -- On recent row → go to currently-reading if it exists.
+            if frec > 1 then
+                self._kb_focus_idx = 1
+            end
+            -- else: only recent row, already at top — no-op
+        else
+            -- On currently-reading row → already at top, no-op.
+            return
+        end
+        self:_refreshImmediate(true)
+        return true
+    end
+
+    -- Down: move to the row below the current focus.
+    --   nil or currently → move to recent row (or enter navbar if no recent)
+    --   on recent        → enter bottom-bar keyboard focus
+    function self:onHSFocusDown()
+        local books = self._kb_book_items_fp
+        local frec  = self._kb_first_rec_idx
+
+        local on_recent = frec and self._kb_focus_idx and self._kb_focus_idx >= frec
+
+        if on_recent then
+            -- Bottom of content — enter navbar keyboard focus.
+            -- Clear the book focus first so the border disappears after the user
+            -- activates a tab (the return callback sets it again on Up/Back).
+            self._kb_focus_idx = nil
+            self:_refreshImmediate(true)
+            local self_ref = self
+            local ret_frec = frec  -- capture row-start index for the return callback
+            local Patches  = require("sui_patches")
+            Patches.enterNavbarKbFocus(function()
+                -- User pressed Up/Back from the navbar → restore recent-row focus.
+                self_ref._kb_focus_idx = ret_frec
+                self_ref:_refreshImmediate(true)
+            end)
+            return true
+        end
+
+        if not books or #books == 0 then return end
+
+        if self._kb_focus_idx == nil then
+            -- Not yet focused: focus the first content row.
+            self._kb_focus_idx = 1
+        elseif frec then
+            -- On currently-reading → jump to recent row.
+            self._kb_focus_idx = frec
+        else
+            -- Only currently-reading row, no recent — enter navbar directly.
+            self._kb_focus_idx = nil
+            self:_refreshImmediate(true)
+            local self_ref = self
+            local Patches  = require("sui_patches")
+            Patches.enterNavbarKbFocus(function()
+                self_ref._kb_focus_idx = 1
+                self_ref:_refreshImmediate(true)
+            end)
+            return true
+        end
+        self:_refreshImmediate(true)
+        return true
+    end
+
+    -- Left: move one step left within the recent-books row (clamp at first).
+    function self:onHSFocusLeft()
+        local frec = self._kb_first_rec_idx
+        if not frec or not self._kb_focus_idx then return end
+        if self._kb_focus_idx < frec then return end  -- on currently row, ignore
+        if self._kb_focus_idx > frec then
+            self._kb_focus_idx = self._kb_focus_idx - 1
+            self:_refreshImmediate(true)
+            return true
+        end
+        -- already at leftmost recent book
+    end
+
+    -- Right: move one step right within the recent-books row (clamp at last).
+    function self:onHSFocusRight()
+        local frec  = self._kb_first_rec_idx
+        local books = self._kb_book_items_fp
+        if not frec or not self._kb_focus_idx or not books then return end
+        if self._kb_focus_idx < frec then return end  -- on currently row, ignore
+        if self._kb_focus_idx < #books then
+            self._kb_focus_idx = self._kb_focus_idx + 1
+            self:_refreshImmediate(true)
+            return true
+        end
+        -- already at rightmost recent book
+    end
+
+    -- Press: open the currently focused book.
+    function self:onHSKbPress()
+        if self._kb_focus_idx == nil then return end
+        local books = self._kb_book_items_fp
+        if not books then return end
+        local fp = books[self._kb_focus_idx]
+        if fp then
+            self._kb_focus_idx = nil
+            openBook(fp)
+        end
+        return true
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -718,8 +866,32 @@ function HomescreenWidget:_buildContent()
     self._header_body_ref   = body
     self._header_is_wrapped = false
     local _tr = _  -- capture gettext before the loop's _ variable shadows it
+    -- Keyboard-navigation book list: rebuilt on every _buildContent call.
+    -- Populated in order below as modules are processed.
+    local _kb_books = {}
+    self._kb_first_rec_idx = nil  -- index where recent books start (nil = no recent row)
+
     local first_mod = true
     for _, mod in ipairs(enabled_mods) do
+        -- Track book items for keyboard navigation and pass focus state to modules.
+        ctx.kb_currently_focused = nil
+        ctx.kb_recent_focus_idx  = nil
+        if mod.id == "currently" and ctx.current_fp then
+            _kb_books[#_kb_books + 1] = ctx.current_fp
+            ctx.kb_currently_focused = (self._kb_focus_idx == #_kb_books)
+        elseif mod.id == "recent" and #(ctx.recent_fps or {}) > 0 then
+            local first_rec_idx = #_kb_books + 1
+            self._kb_first_rec_idx = first_rec_idx
+            local n = math.min(#ctx.recent_fps, 5)
+            for i = 1, n do
+                _kb_books[#_kb_books + 1] = ctx.recent_fps[i]
+            end
+            if self._kb_focus_idx and self._kb_focus_idx >= first_rec_idx
+                    and self._kb_focus_idx <= #_kb_books then
+                ctx.kb_recent_focus_idx = self._kb_focus_idx - first_rec_idx + 1
+            end
+        end
+
         local ok_w, widget = pcall(mod.build, inner_w, ctx)
         if not ok_w then
             logger.warn("simpleui homescreen: build failed for "
@@ -815,6 +987,9 @@ function HomescreenWidget:_buildContent()
         pcall(function() self._db_conn:close() end)
         self._db_conn = nil
     end
+
+    -- Persist the ordered book list for keyboard navigation.
+    self._kb_book_items_fp = _kb_books
 
     if empty_widget then
         body[#body+1] = empty_widget
@@ -1121,6 +1296,9 @@ function HomescreenWidget:onCloseWidget()
     self._hs_ctx_menu        = nil
     self._shown_once         = nil
     self._stats_need_refresh = nil
+    self._kb_book_items_fp   = nil
+    self._kb_focus_idx       = nil
+    self._kb_first_rec_idx   = nil
 
     -- Cancel the module_clock timer and release clock swap state.
     local ClockMod = Registry.get("clock")

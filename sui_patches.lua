@@ -35,6 +35,19 @@ local _start_with_hs = nil
 -- Navpager rebuild coalescence flag.
 local _navpager_rebuild_pending = false
 
+-- Navbar keyboard focus mode: transparent InputContainer placed on top of the
+-- UIManager stack while the user navigates bottom bar tabs via keyboard.
+-- nil when inactive.  _navbar_kb_idx is the 1-based index of the focused tab.
+local _navbar_kb_capture    = nil
+local _navbar_kb_idx        = 1
+-- Optional callback invoked when Up/Back exits navbar keyboard focus mode.
+-- Set by callers such as the homescreen that need to restore their own focus
+-- instead of the default file-chooser last-item focus.
+local _navbar_kb_return_fn  = nil
+-- Forward reference set once inside patchFileManagerClass so the function can
+-- be called from outside (e.g. HomescreenWidget) via M.enterNavbarKbFocus.
+local _enterNavbarKbFocus_fn = nil
+
 -- Returns true when "Start with Homescreen" is the active start_with value.
 -- Caches the result so UIManager.show and UIManager.close (hot paths) avoid
 -- repeated settings lookups on every call.
@@ -131,12 +144,143 @@ function M.patchFileManagerClass(plugin)
             local orig_fc_init   = FileChooser.init
             plugin._orig_fc_init = orig_fc_init
             FileChooser._navbar_patched = true
+
+            -- Capture device + focusmanager references once; shared by the lambdas below.
+            local _Device2      = require("device")
+            local _FocusManager = require("ui/widget/focusmanager")
+
+            -- _enterNavbarKbFocus: called when Down is pressed at the last file.
+            -- Pushes a transparent InputContainer onto the UIManager stack that
+            -- captures Left/Right (tab navigation), Press (activate), Up/Back (exit).
+            -- Optional return_fn is called when Up/Back exits, instead of the
+            -- default file-chooser focus-return (used by the homescreen).
+            local function _enterNavbarKbFocus(return_fn)
+                if not _Device2:hasDPad() then return end
+                if not G_reader_settings:nilOrTrue("navbar_enabled") then return end
+                if _navbar_kb_capture then return end  -- already active
+                _navbar_kb_return_fn = return_fn or false
+
+                -- Find the 1-based index of the currently active tab.
+                local tabs = Config.loadTabConfig()
+                _navbar_kb_idx = 1
+                for i, t in ipairs(tabs) do
+                    if t == plugin.active_action then _navbar_kb_idx = i; break end
+                end
+
+                -- Rebuild the bar with a focus-border on the active tab.
+                -- Use the topmost fullscreen widget that carries a navbar — this is
+                -- the widget whose bar is actually visible on screen right now.
+                -- When the Library is active it is fm; when History/Collections/
+                -- Homescreen is on top it is that widget instead.
+                local FM0 = package.loaded["apps/filemanager/filemanager"]
+                local fm0 = FM0 and FM0.instance
+                local target0 = M._getNavbarTarget and M._getNavbarTarget(fm0) or fm0
+                if target0 then
+                    Bottombar.replaceBar(target0,
+                        Bottombar.buildBarWidgetWithKeyFocus(plugin.active_action, tabs, _navbar_kb_idx),
+                        tabs)
+                    UIManager:setDirty(target0, "ui")
+                end
+
+                -- Build the transparent input-only overlay widget.
+                local InputContainer2 = require("ui/widget/container/inputcontainer")
+                local Geom2 = require("ui/geometry")
+                local capture = InputContainer2:new{
+                    dimen             = Geom2:new{ x = 0, y = 0, w = Screen:getWidth(), h = Screen:getHeight() },
+                    covers_fullscreen = false,
+                }
+                function capture:paintTo() end  -- transparent
+
+                local function _moveNavbar(delta)
+                    local t2 = Config.loadTabConfig()
+                    _navbar_kb_idx = ((_navbar_kb_idx - 1 + delta + #t2) % #t2) + 1
+                    local FM2 = package.loaded["apps/filemanager/filemanager"]
+                    local fm2 = FM2 and FM2.instance
+                    local target2 = M._getNavbarTarget and M._getNavbarTarget(fm2) or fm2
+                    if target2 then
+                        Bottombar.replaceBar(target2,
+                            Bottombar.buildBarWidgetWithKeyFocus(plugin.active_action, t2, _navbar_kb_idx),
+                            t2)
+                        UIManager:setDirty(target2, "ui")
+                    end
+                end
+
+                local function _exitNavbarKb()
+                    _navbar_kb_capture = nil
+                    UIManager:close(capture)
+                    -- Restore the normal (unfocused) bar.
+                    local FM2 = package.loaded["apps/filemanager/filemanager"]
+                    local fm2 = FM2 and FM2.instance
+                    local target2 = M._getNavbarTarget and M._getNavbarTarget(fm2) or fm2
+                    if target2 then
+                        local t2 = Config.loadTabConfig()
+                        Bottombar.replaceBar(target2, Bottombar.buildBarWidget(plugin.active_action, t2), t2)
+                        UIManager:setDirty(target2, "ui")
+                    end
+                    -- Invoke caller-supplied return callback if present,
+                    -- otherwise fall back to returning focus to the file chooser.
+                    local ret_fn = _navbar_kb_return_fn
+                    _navbar_kb_return_fn = nil
+                    if ret_fn then
+                        ret_fn()
+                    elseif fm2 then
+                        local fc = fm2.file_chooser
+                        if fc and fc.layout and #fc.layout > 0 then
+                            fc:moveFocusTo(1, #fc.layout, _FocusManager.FORCED_FOCUS)
+                        end
+                    end
+                end
+
+                capture.key_events = {}
+                capture.key_events.NavbarKbLeft  = { { "Left"  } }
+                capture.key_events.NavbarKbRight = { { "Right" } }
+                capture.key_events.NavbarKbPress = { { "Press" } }
+                capture.key_events.NavbarKbUp    = { { "Up"    } }
+                if _Device2.input and _Device2.input.group then
+                    capture.key_events.NavbarKbBack = { { _Device2.input.group.Back } }
+                end
+
+                function capture:onNavbarKbLeft()   _moveNavbar(-1); return true end
+                function capture:onNavbarKbRight()  _moveNavbar(1);  return true end
+                function capture:onNavbarKbUp()     _exitNavbarKb(); return true end
+                function capture:onNavbarKbBack()   _exitNavbarKb(); return true end
+                function capture:onNavbarKbPress()
+                    _navbar_kb_capture = nil
+                    UIManager:close(capture)
+                    local t2 = Config.loadTabConfig()
+                    local action_id = t2[_navbar_kb_idx]
+                    if action_id then
+                        local FM2 = package.loaded["apps/filemanager/filemanager"]
+                        local fm2 = FM2 and FM2.instance
+                        Bottombar.onTabTap(plugin, action_id, fm2 or plugin.ui)
+                    end
+                    return true
+                end
+
+                _navbar_kb_capture = capture
+                UIManager:show(capture)
+            end
+            -- Expose so external callers (homescreen) can enter navbar KB mode.
+            _enterNavbarKbFocus_fn = _enterNavbarKbFocus
+
             FileChooser.init = function(fc_self)
                 if fc_self.height == nil and fc_self.width == nil then
                     fc_self.height = UI.getContentHeight()
                     fc_self.y      = UI.getContentTop()
                 end
                 orig_fc_init(fc_self)
+                -- Intercept downward wrap-around to enter navbar keyboard focus mode
+                -- instead of cycling back to the first file in the list.
+                if _Device2:hasDPad() then
+                    local _origWrapY = _FocusManager._wrapAroundY
+                    fc_self._wrapAroundY = function(self_fc, dy)
+                        if dy == 1 and G_reader_settings:nilOrTrue("navbar_enabled") then
+                            _enterNavbarKbFocus()
+                            return false  -- stay at last item; suppress wrap
+                        end
+                        return _origWrapY(self_fc, dy)
+                    end
+                end
             end
         end
 
@@ -784,6 +928,36 @@ function M.patchUIManagerShow(plugin)
         widget[1]                  = wrapped
         plugin:_registerTouchZones(widget)
         UI.applyGesturePriorityHandleEvent(widget)
+
+        -- For injected FocusManager-based fullscreen widgets (History, Collections,
+        -- Favorites, etc.) add a per-instance _wrapAroundY override so that pressing
+        -- Down at the last item enters navbar keyboard focus instead of wrapping back
+        -- to the top.  HomescreenWidget handles this itself via onHSFocusDown.
+        if require("device"):hasDPad()
+                and widget.name ~= "homescreen"
+                and widget.selected  -- FocusManager sets this; plain InputContainers don't
+                and not widget._navbar_wrapY_patched then
+            widget._navbar_wrapY_patched = true
+            local _FocMgr2    = require("ui/widget/focusmanager")
+            local _origWrapY  = _FocMgr2._wrapAroundY
+            local _widget_ref = widget
+            widget._wrapAroundY = function(self_w, dy)
+                if dy == 1 and G_reader_settings:nilOrTrue("navbar_enabled") then
+                    if _enterNavbarKbFocus_fn then
+                        _enterNavbarKbFocus_fn(function()
+                            -- On Up/Back from navbar: restore focus to the last
+                            -- item in this widget's layout.
+                            if _widget_ref.layout and #_widget_ref.layout > 0 then
+                                _widget_ref:moveFocusTo(1, #_widget_ref.layout,
+                                    _FocMgr2.FORCED_FOCUS)
+                            end
+                        end)
+                    end
+                    return false  -- stay at last item; suppress wrap
+                end
+                return _origWrapY(self_w, dy)
+            end
+        end
 
         -- Register top-of-screen tap/swipe zones to open the KOReader main menu,
         -- mirroring FileManagerMenu:initGesListener for all injected pages.
@@ -1556,6 +1730,13 @@ function M.teardownAll(plugin)
     _hs_pending_after_reader   = false
     _start_with_hs             = nil
     _navpager_rebuild_pending  = false
+    -- Close any active navbar keyboard focus capture widget.
+    if _navbar_kb_capture then
+        pcall(function() UIManager:close(_navbar_kb_capture) end)
+        _navbar_kb_capture = nil
+    end
+    _navbar_kb_idx       = 1
+    _navbar_kb_return_fn = nil
     Config.reset()
     local Registry = package.loaded["desktop_modules/moduleregistry"]
     if Registry then Registry.invalidate() end
@@ -1563,6 +1744,14 @@ function M.teardownAll(plugin)
     if FC then
         pcall(FC.uninstall)
     end
+end
+
+-- Allow external modules (e.g. HomescreenWidget) to trigger navbar keyboard
+-- focus mode the same way the file-chooser does on Down-past-last-item.
+-- return_fn (optional) is called when the user exits the mode via Up/Back;
+-- if nil, the default behaviour (return focus to file chooser) is used.
+function M.enterNavbarKbFocus(return_fn)
+    if _enterNavbarKbFocus_fn then _enterNavbarKbFocus_fn(return_fn) end
 end
 
 return M

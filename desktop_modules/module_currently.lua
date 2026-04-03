@@ -582,6 +582,22 @@ function M.build(w, ctx)
         return true
     end
 
+    -- Keyboard focus: overlay a black rectangular border on the tappable when
+    -- this book is the currently selected keyboard-navigation item.
+    if ctx.kb_currently_focused then
+        local bw = Screen:scaleBySize(3)
+        local tw = w
+        local th = content_h
+        return OverlapGroup:new{
+            dimen = Geom:new{ w = tw, h = th },
+            tappable,
+            LineWidget:new{ dimen = Geom:new{ w = tw, h = bw },    background = Blitbuffer.COLOR_BLACK },
+            LineWidget:new{ dimen = Geom:new{ w = tw, h = bw },    background = Blitbuffer.COLOR_BLACK, overlap_offset = {0, th - bw} },
+            LineWidget:new{ dimen = Geom:new{ w = bw, h = th },    background = Blitbuffer.COLOR_BLACK },
+            LineWidget:new{ dimen = Geom:new{ w = bw, h = th },    background = Blitbuffer.COLOR_BLACK, overlap_offset = {tw - bw, 0} },
+        }
+    end
+
     return tappable
 end
 

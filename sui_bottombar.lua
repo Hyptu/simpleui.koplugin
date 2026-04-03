@@ -501,6 +501,51 @@ function M.buildBarWidgetWithArrows(active_action_id, tab_config, mode, has_prev
 	return fc
 end
 
+-- Builds a bottom bar identical to buildBarWidget but with a keyboard-focus
+-- rectangle rendered over the tab at kbfocus_idx (1-based).
+-- Used by the library-screen keyboard navigation mode.
+-- Falls back to plain buildBarWidget when navpager is active or kbfocus_idx is nil.
+function M.buildBarWidgetWithKeyFocus(active_action_id, tab_config, kbfocus_idx, num_tabs, mode)
+	if not kbfocus_idx or Config.isNavpagerEnabled() then
+		return M.buildBarWidget(active_action_id, tab_config, num_tabs, mode)
+	end
+	num_tabs = num_tabs or Config.getNumTabs()
+	mode     = mode     or Config.getNavbarMode()
+	local screen_w = Screen:getWidth()
+	local side_m   = M.SIDE_M()
+	local usable_w = screen_w - side_m * 2
+	local widths   = M.getTabWidths(num_tabs, usable_w)
+	local hg_args  = { align = "top" }
+	local bw       = Screen:scaleBySize(3)
+	local OverlapGroup = require("ui/widget/overlapgroup")
+	for i = 1, num_tabs do
+		local action_id = tab_config[i]
+		local cell = M.buildTabCell(action_id, action_id == active_action_id, widths[i], mode)
+		if i == kbfocus_idx then
+			local tw    = widths[i]
+			local tab_h = M.BAR_H()
+			cell = OverlapGroup:new{
+				dimen = Geom:new{ w = tw, h = tab_h },
+				cell,
+				LineWidget:new{ dimen = Geom:new{ w = tw, h = bw },    background = Blitbuffer.COLOR_BLACK },
+				LineWidget:new{ dimen = Geom:new{ w = tw, h = bw },    background = Blitbuffer.COLOR_BLACK, overlap_offset = {0, tab_h - bw} },
+				LineWidget:new{ dimen = Geom:new{ w = bw, h = tab_h }, background = Blitbuffer.COLOR_BLACK },
+				LineWidget:new{ dimen = Geom:new{ w = bw, h = tab_h }, background = Blitbuffer.COLOR_BLACK, overlap_offset = {tw - bw, 0} },
+			}
+		end
+		hg_args[#hg_args + 1] = cell
+	end
+	return FrameContainer:new{
+		bordersize    = 0,
+		padding       = 0,
+		padding_left  = side_m,
+		padding_right = side_m,
+		margin        = 0,
+		background    = Blitbuffer.COLOR_WHITE,
+		HorizontalGroup:new(hg_args),
+	}
+end
+
 -- Swaps the bar widget inside an already-wrapped widget, preserving overlap_offset.
 function M.replaceBar(widget, new_bar, tabs)
 	if not G_reader_settings:nilOrTrue("navbar_enabled") then
