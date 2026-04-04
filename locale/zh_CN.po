@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: simpleui\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-03-27 12:00+0000\n"
-"PO-Revision-Date: 2026-04-04 16:56+0800\n"
+"PO-Revision-Date: 2026-04-04 19:59+0800\n"
 "Last-Translator: \n"
 "Language-Team: Chinese (Simplified)\n"
 "Language: zh_CN\n"
@@ -260,7 +260,8 @@ msgstr "按钮大小"
 #: desktop_modules/module_quote.lua:892
 #: desktop_modules/module_reading_goals.lua:366
 #: desktop_modules/module_reading_goals.lua:383
-#: desktop_modules/module_reading_goals.lua:401
+#: desktop_modules/module_reading_goals.lua:401 sui_updater.lua:184
+#: sui_updater.lua:237 sui_updater.lua:258
 msgid "Cancel"
 msgstr "取消"
 
@@ -677,7 +678,7 @@ msgid "Large"
 msgstr "大"
 
 #: sui_menu.lua:310 sui_menu.lua:340 sui_menu.lua:398 sui_menu.lua:570
-#: sui_menu.lua:627 sui_menu.lua:948 sui_menu.lua:1524
+#: sui_menu.lua:627 sui_menu.lua:948 sui_menu.lua:1524 sui_updater.lua:184
 msgid "Later"
 msgstr "稍后"
 
@@ -1123,6 +1124,7 @@ msgstr "重置为默认缩放"
 
 #: sui_bottombar.lua:1412 sui_menu.lua:310 sui_menu.lua:340 sui_menu.lua:398
 #: sui_menu.lua:570 sui_menu.lua:627 sui_menu.lua:947 sui_menu.lua:1524
+#: sui_updater.lua:183
 msgid "Restart"
 msgstr "重启"
 
@@ -1761,6 +1763,22 @@ msgstr "为空文件夹显示占位封面"
 msgid "  Scan subfolders for cover"
 msgstr "扫描子文件夹中的封面"
 
+#: sui_menu.lua
+msgid "Check for Updates"
+msgstr "检查更新"
+
+#: sui_menu.lua
+msgid "About"
+msgstr "关于"
+
+#: sui_menu.lua
+msgid "Version: %s"
+msgstr "版本：%s"
+
+#: sui_menu.lua
+msgid "Author: %s"
+msgstr "作者:%s"
+
 #: sui_homescreen.lua:407 desktop_modules/module_quote.lua:950
 msgid "Open this file?"
 msgstr "打开这个文件吗？"
@@ -1768,6 +1786,78 @@ msgstr "打开这个文件吗？"
 #: sui_bottombar.lua:1638
 msgid "Sleep"
 msgstr "休眠"
+
+#: sui_updater.lua:157
+msgid "Downloading Simple UI "
+msgstr "正在下载 Simple UI"
+
+#: sui_updater.lua:163
+msgid "Download error: "
+msgstr "下载错误："
+
+#: sui_updater.lua:174
+msgid "Extraction error: "
+msgstr "提取错误：%s"
+
+#: sui_updater.lua:180
+msgid ""
+"Simple UI %s successfully installed.\n"
+"\n"
+"Restart KOReader to apply the update?"
+msgstr ""
+"Simple UI %s 已成功安装。\n"
+"\n"
+"是否重启 KOReader 以使更新生效？"
+
+#: sui_updater.lua:194
+msgid "Checking for updates..."
+msgstr "检查更新..."
+
+#: sui_updater.lua:200
+msgid "Error checking for updates: "
+msgstr "检查更新时出错： "
+
+#: sui_updater.lua:216
+msgid "Could not retrieve version information."
+msgstr "无法获取版本信息"
+
+#: sui_updater.lua:222
+msgid "Simple UI is up to date (%s)."
+msgstr "Simple UI 已是最新版本（%s）"
+
+#: sui_updater.lua:233
+msgid ""
+"Simple UI %s is available (you have %s).\n"
+"\n"
+"No automatic update file was found.\n"
+"\n"
+"Open the releases page on GitHub?"
+msgstr ""
+"Simple UI %s 可用（您当前版本为 %s）。\n"
+"\n"
+"未找到自动更新文件。\n"
+"\n"
+"是否打开 GitHub 发布页面？"
+
+#: sui_updater.lua:236
+msgid "Open in browser"
+msgstr "在浏览器中打开"
+
+#: sui_updater.lua:254
+msgid ""
+"Simple UI %s is available!\n"
+"Current version: %s\n"
+"\n"
+"Download and install now?"
+msgstr ""
+"Simple UI %s 有新版本！\n"
+"当前版本：%s\n"
+"\n"
+"是否立即下载并安装？"
+
+#: sui_updater.lua:257
+msgid "Download and install"
+msgstr "下载并安装"
 
 #~ msgid "%s TO GO"
 #~ msgstr "还剩 %s"
