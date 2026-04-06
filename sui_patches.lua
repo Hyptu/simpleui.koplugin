@@ -1783,19 +1783,40 @@ do
             if not (HS and HS._instance) then
                 return orig_execute(self, settings, exec_props)
             end
-            -- Homescreen is active: redirect sendEvent → broadcastEvent so FM
-            -- module handlers (collections, history, search) receive the event.
-            local UIManager = require("ui/uimanager")
-            local orig_send = UIManager.sendEvent
-            UIManager.sendEvent = function(um, ev) return UIManager:broadcastEvent(ev) end
+            -- Homescreen is active: sink HS to the bottom of the window stack so
+            -- that FM and its plugins sit on top and receive sendEvent normally.
+            -- This mirrors what _executeInPlace does for bottombar QA actions, and
+            -- fixes overlays (e.g. Reading Statistics: Show Progress) that were
+            -- invisible when triggered via a QuickMenu because the old
+            -- sendEvent→broadcastEvent redirect caused delivery ordering issues.
+            local UIManager_ref = require("ui/uimanager")
+            local stack   = UIManager_ref._window_stack
+            local hs_inst = HS._instance
+            local hs_idx  = nil
+            for i, entry in ipairs(stack) do
+                if entry.widget == hs_inst then hs_idx = i; break end
+            end
+            if hs_idx and hs_idx > 1 then
+                local entry = table.remove(stack, hs_idx)
+                table.insert(stack, 1, entry)
+            end
             local ok2, err = pcall(orig_execute, self, settings, exec_props)
-            UIManager.sendEvent = orig_send
+            -- Restore HS to its original position regardless of success/failure.
+            if hs_idx and hs_idx > 1 then
+                for i, entry in ipairs(stack) do
+                    if entry.widget == hs_inst then
+                        local e = table.remove(stack, i)
+                        table.insert(stack, hs_idx, e)
+                        break
+                    end
+                end
+            end
             if not ok2 then
-                logger.warn("simpleui: Dispatcher:execute (hs broadcast):", err)
+                logger.warn("simpleui: Dispatcher:execute (hs sink):", err)
             end
         end
         Dispatcher._simpleui_execute_patched = true
-        logger.dbg("simpleui: Dispatcher:execute patched for homescreen broadcastEvent")
+        logger.dbg("simpleui: Dispatcher:execute patched for homescreen stack-sink")
     end
 end
 
