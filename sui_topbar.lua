@@ -487,7 +487,10 @@ function M.registerTouchZones(plugin, fm_self)
             ges         = "hold_release",
             screen_zone = topbar_zone,
             handler = function(_ges)
-                if not plugin._makeTopbarMenu then plugin:addToMainMenu({}) end
+			if not G_reader_settings:nilOrTrue("navbar_topbar_settings_on_hold") then
+				return true
+			end
+			 if not plugin._makeTopbarMenu then plugin:addToMainMenu({}) end
                 local UI_mod    = require("sui_core")
                 local Bottombar = require("sui_bottombar")
                 -- Delegates to the shared implementation in ui.lua (#4).

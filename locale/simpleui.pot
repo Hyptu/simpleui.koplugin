@@ -1741,3 +1741,19 @@ msgstr ""
 #: sui_updater.lua:257
 msgid "Download and install"
 msgstr ""
+
+#: sui_menu.lua
+msgid "Settings on Long Tap"
+msgstr ""
+
+#: sui_menu.lua
+msgid "When enabled, long-pressing a section opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."
+msgstr ""
+
+#: sui_menu.lua
+msgid "When enabled, long-pressing the top bar opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."
+msgstr ""
+
+#: sui_menu.lua
+msgid "When enabled, long-pressing the bottom bar opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."
+msgstr ""

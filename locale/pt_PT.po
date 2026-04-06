@@ -1747,3 +1747,19 @@ msgstr "O Simple UI %s está disponível!\nVersão atual: %s\n\nDescarregar e in
 #: sui_updater.lua:257
 msgid "Download and install"
 msgstr "Descarregar e instalar"
+
+#: sui_menu.lua
+msgid "Settings on Long Tap"
+msgstr "Definições com toque longo"
+
+#: sui_menu.lua
+msgid "When enabled, long-pressing a section opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."
+msgstr "Quando ativado, manter premida uma secção abre o seu menu de definições.\nDesative para evitar que o menu de definições apareça com toque longo."
+
+#: sui_menu.lua
+msgid "When enabled, long-pressing the top bar opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."
+msgstr "Quando ativado, manter premida a barra superior abre o seu menu de definições.\nDesative para evitar que o menu de definições apareça com toque longo."
+
+#: sui_menu.lua
+msgid "When enabled, long-pressing the bottom bar opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."
+msgstr "Quando ativado, manter premida a barra inferior abre o seu menu de definições.\nDesative para evitar que o menu de definições apareça com toque longo."

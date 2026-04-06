@@ -712,6 +712,18 @@ SimpleUIPlugin.addToMainMenu = function(self, menu_items)
                 end,
             },
             { text = _("Items"), sub_item_table_func = makeTopbarItemsMenu },
+            {
+                text         = _("Settings on Long Tap"),
+                help_text    = _("When enabled, long-pressing the top bar opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."),
+                checked_func = function()
+                    return G_reader_settings:nilOrTrue("navbar_topbar_settings_on_hold")
+                end,
+                keep_menu_open = true,
+                callback = function()
+                    local on = G_reader_settings:nilOrTrue("navbar_topbar_settings_on_hold")
+                    G_reader_settings:saveSetting("navbar_topbar_settings_on_hold", not on)
+                end,
+            },
         }
     end
 
@@ -869,6 +881,18 @@ SimpleUIPlugin.addToMainMenu = function(self, menu_items)
                     return string.format(_("Tabs  (%d/%d — %d left)"), n, limit, remaining)
                 end,
                 sub_item_table_func = makeTabsMenu,
+            },
+            {
+                text         = _("Settings on Long Tap"),
+                help_text    = _("When enabled, long-pressing the bottom bar opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."),
+                checked_func = function()
+                    return G_reader_settings:nilOrTrue("navbar_bottombar_settings_on_hold")
+                end,
+                keep_menu_open = true,
+                callback = function()
+                    local on = G_reader_settings:nilOrTrue("navbar_bottombar_settings_on_hold")
+                    G_reader_settings:saveSetting("navbar_bottombar_settings_on_hold", not on)
+                end,
             },
         }
     end
@@ -1557,6 +1581,18 @@ SimpleUIPlugin.addToMainMenu = function(self, menu_items)
                 callback = function()
                     local on = G_reader_settings:readSetting("start_with", "filemanager") == "homescreen_simpleui"
                     G_reader_settings:saveSetting("start_with", on and "filemanager" or "homescreen_simpleui")
+                end,
+            },
+            {
+                text         = _("Settings on Long Tap"),
+                help_text    = _("When enabled, long-pressing a section opens its settings menu.\nDisable this to prevent the settings menu from appearing on long tap."),
+                checked_func = function()
+                    return G_reader_settings:nilOrTrue("navbar_homescreen_settings_on_hold")
+                end,
+                keep_menu_open = true,
+                callback = function()
+                    local on = G_reader_settings:nilOrTrue("navbar_homescreen_settings_on_hold")
+                    G_reader_settings:saveSetting("navbar_homescreen_settings_on_hold", not on)
                 end,
                 separator = true,
             },

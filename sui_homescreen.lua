@@ -1561,6 +1561,12 @@ end
 -- per-page-turn closure allocation that the old inline approach caused.
 -- ---------------------------------------------------------------------------
 function HomescreenWidget:_onHoldModRelease(wrapper)
+    -- Honour the "Settings on Long Tap" toggle.
+    -- When the setting is explicitly false the hold gesture is silently consumed
+    -- (returns true to prevent propagation) without opening the menu.
+    if not G_reader_settings:nilOrTrue("navbar_homescreen_settings_on_hold") then
+        return true
+    end
     local mod      = wrapper._sui_mod   -- set on the wrapper InputContainer
     local hs       = wrapper._sui_hs    -- back-reference to HomescreenWidget
     if not mod or not hs then return true end
@@ -1639,7 +1645,12 @@ function HomescreenWidget:_makeModWrapper(mod, widget, inner_w)
         -- onHoldMod just consumes the event so hold doesn't propagate.
         -- onHoldModRelease delegates to the shared method on HomescreenWidget
         -- via the _sui_hs back-reference — zero new closures per page turn.
-        function w:onHoldMod() return true end
+        function w:onHoldMod()
+            if not G_reader_settings:nilOrTrue("navbar_homescreen_settings_on_hold") then
+                return  -- do not consume; hold_release will not fire on this wrapper
+            end
+            return true
+        end
         function w:onHoldModRelease() return self._sui_hs:_onHoldModRelease(self) end
         pool[mod.id] = w
     end

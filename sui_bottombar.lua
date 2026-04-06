@@ -833,7 +833,10 @@ function M.registerTouchZones(plugin, fm_self)
                 end
             end
             -- Held anywhere else on the bar → open settings menu.
-            if not plugin._makeNavbarMenu then plugin:addToMainMenu({}) end
+			if not G_reader_settings:nilOrTrue("navbar_bottombar_settings_on_hold") then
+				return true
+			end
+			if not plugin._makeNavbarMenu then plugin:addToMainMenu({}) end
             local UI_mod     = require("sui_core")
             local topbar_on  = G_reader_settings:nilOrTrue("navbar_topbar_enabled")
             local top_offset = topbar_on and require("sui_topbar").TOTAL_TOP_H() or 0
