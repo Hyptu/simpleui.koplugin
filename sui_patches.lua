@@ -178,6 +178,67 @@ function M.patchFileManagerClass(plugin)
             end
         end
 
+        -- Patch FileManager.reinit so that external callers (e.g. NewsDownloader
+        -- "Go to news folder") work correctly when the homescreen is on top.
+        --
+        -- Without this, reinit() silently rebuilds the FM underneath the
+        -- homescreen and the user never sees the target folder.
+        --
+        -- When the homescreen IS open we skip reinit entirely and instead:
+        --   1. Close the homescreen intentionally (suppresses _doShowHS reopen).
+        --   2. Navigate the already-visible FM to the requested path directly,
+        --      bypassing the onShow "go home" reset that showFiles would trigger.
+        --   3. Rebuild the navbar bar with the Library tab active.
+        --   4. Set _sui_show_folder_pending so that the calling TouchMenu closing
+        --      afterwards does not trigger another _doShowHS.
+        -- When the homescreen is NOT open the call is a transparent pass-through.
+        if not FileManager._simpleui_reinit_patched then
+            FileManager._simpleui_reinit_patched = true
+            local orig_reinit = FileManager.reinit
+            FileManager.reinit = function(fm_self, path, focused_file)
+                local HS      = liveHS()
+                local hs_inst = HS and HS._instance
+                if not hs_inst then
+                    return orig_reinit(fm_self, path, focused_file)
+                end
+
+                -- Resolve the target path the same way reinit would.
+                local ffiUtil = require("ffi/util")
+                local resolved = ffiUtil.realpath(path) or path
+
+                -- 1. Close the homescreen intentionally.
+                hs_inst._navbar_closing_intentionally = true
+                pcall(function() UIManager:close(hs_inst) end)
+                hs_inst._navbar_closing_intentionally = nil
+
+                -- 2. Navigate the FM to the requested path.
+                --    Suppress onPathChanged — we rebuild the bar explicitly below.
+                if fm_self.file_chooser and resolved then
+                    fm_self._navbar_suppress_path_change = true
+                    pcall(function() fm_self.file_chooser:changeToPath(resolved) end)
+                    fm_self._navbar_suppress_path_change = nil
+                end
+
+                -- 3. Update the title bar to show the new path.
+                if fm_self.updateTitleBarPath then
+                    pcall(function() fm_self:updateTitleBarPath(resolved, false) end)
+                end
+
+                -- 4. Rebuild the navbar with the Library ("home") tab active.
+                local sui = fm_self._simpleui_plugin
+                if sui then sui.active_action = "home" end
+                local tabs = Config.loadTabConfig()
+                if fm_self._navbar_container then
+                    Bottombar.replaceBar(fm_self, Bottombar.buildBarWidget("home", tabs), tabs)
+                    UIManager:setDirty(fm_self, "ui")
+                end
+
+                -- 5. Suppress _doShowHS for the TouchMenu that closes after
+                --    the calling menu callback returns.
+                fm_self._sui_show_folder_pending = true
+            end
+        end
+
         orig_setupLayout(fm_self)
 
         -- Apply title-bar customisations (no-op when the setting is off).
