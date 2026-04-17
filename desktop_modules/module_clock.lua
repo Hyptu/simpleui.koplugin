@@ -35,30 +35,29 @@ local _weekdays = nil
 local _months   = nil
 
 local function _localDate()
-    -- Pass os.time() explicitly: os.date("*t") without argument can return
-    -- nil in LuaJIT on some platforms (macOS emulator) when timezone handling
-    -- fails. os.date("*t", os.time()) is always safe.
-    local now = os.time()
-    local t   = os.date("*t", now)
-    if not t or not t.mday then
-        -- Fallback via the datetime module's locale-aware formatter.
+    local now   = os.time()
+    -- os.date("*t") returns nil on LuaJIT/eReader platforms; format strings are safe.
+    local wday  = tonumber(os.date("%w", now))  -- 0 = Sunday
+    local mday  = tonumber(os.date("%d", now))
+    local month = tonumber(os.date("%m", now))
+    local year  = tonumber(os.date("%Y", now))
+    if not wday or not mday or not month or not year then
         return datetime.secondsToDate(now, true)
     end
-    -- Build translation tables on first call only; never recreated afterwards.
     if not _weekdays then
         _weekdays = {
-            _("Sunday"), _("Monday"), _("Tuesday"), _("Wednesday"),
-            _("Thursday"), _("Friday"), _("Saturday"),
+            _("Sonntag"), _("Montag"), _("Dienstag"), _("Mittwoch"),
+            _("Donnerstag"), _("Freitag"), _("Samstag"),
         }
         _months = {
-            _("January"), _("February"), _("March"),     _("April"),
-            _("May"),     _("June"),     _("July"),       _("August"),
-            _("September"), _("October"), _("November"),  _("December"),
+            _("Januar"), _("Februar"), _("März"),     _("April"),
+            _("Mai"),     _("Juni"),     _("Juli"),       _("August"),
+            _("September"), _("Oktober"), _("November"),  _("Dezember"),
         }
     end
-    local weekday = _weekdays[t.wday] or os.date("%A", now)
-    local month   = _months[t.month]  or os.date("%B", now)
-    return string.format("%s, %d %s", weekday, t.mday, month)
+    local weekday_str = _weekdays[wday + 1] or os.date("%A", now)
+    local month_str   = _months[month]      or os.date("%B", now)
+    return string.format("%s, %d. %s %d", weekday_str, mday, month_str, year)
 end
 
 -- ---------------------------------------------------------------------------
